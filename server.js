@@ -41,7 +41,7 @@ app.get('/', (req, res) => {
         let rowsHtml = rows.map(row => `
             <tr>
                 <td><a href="${row.original_url}" target="_blank">${row.original_url}</a></td>
-                <td><a href="/${row.short_code}" target="_blank">http://localhost:${PORT}/${row.short_code}</a></td>
+                <td><a href="/${row.short_code}" target="_blank">${req.protocol}://${req.get('host')}/${row.short_code}</a></td>
                 <td><strong>${row.clicks}</strong></td>
             </tr>
         `).join('');
@@ -67,7 +67,7 @@ app.get('/', (req, res) => {
                 </style>
             </head>
             <body>
-                <h2>Skracacz Linków (Node.js + SQLite)</h2>
+                <h2>Ujeb se link</h2>
                 
                 ${req.query.error ? `<p class="error">${req.query.error}</p>` : ''}
 
@@ -148,5 +148,5 @@ app.get('/:code', (req, res) => {
 
 // Uruchomienie serwera
 app.listen(PORT, () => {
-    console.log(`Serwer działa na http://localhost:${PORT}`);
+    console.log(`Aplikacja została pomyślnie uruchomiona na porcie ${PORT}`);
 });

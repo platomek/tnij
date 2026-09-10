@@ -146,7 +146,7 @@ app.get('/admin-panel', async (req, res) => {
             <body>
                 <div class="container">
                     <header>
-                        <h1>Twój Panel Skracacza</h1>
+                        <h1>Skróć linki</h1>
                         <p>Generuj bezpieczne linki i śledź kliknięcia</p>
                     </header>
 

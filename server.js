@@ -41,7 +41,7 @@ app.get('/', (req, res) => {
         let rowsHtml = rows.map(row => `
             <tr>
                 <td class="url-cell"><a href="${row.original_url}" target="_blank" rel="noopener">${row.original_url}</a></td>
-                <td class="short-url-cell"><a href="/${row.short_code}" target="_blank" class="short-link">http://gornikleczna.pl/${row.short_code}</a></td>
+                <td class="short-url-cell"><a href="https://gornikleczna.pl/${row.short_code}" target="_blank" class="short-link">https://gornikleczna.pl/${row.short_code}</a></td>
                 <td><span class="badge">${row.clicks}</span></td>
             </tr>
         `).join('');
@@ -57,7 +57,7 @@ app.get('/', (req, res) => {
                     :root {
                         --bg-color: #f4f6f9;
                         --card-bg: #ffffff;
-                        --primary: #4f46e5;
+                        --primary: #018E45;
                         --primary-hover: #4338ca;
                         --text-main: #1f2937;
                         --text-muted: #6b7280;
@@ -130,7 +130,7 @@ app.get('/', (req, res) => {
                     .short-link { color: var(--primary); font-weight: 600; text-decoration: none; }
                     .short-link:hover { text-decoration: underline; }
 
-                    .badge { display: inline-block; background-color: #e0e7ff; color: #3730a3; font-weight: 700; padding: 4px 10px; border-radius: 12px; font-size: 0.8rem; }
+                    .badge { display: inline-block; background-color: #e0e7ff; color: #018E45; font-weight: 700; padding: 4px 10px; border-radius: 12px; font-size: 0.8rem; }
 
                     /* RWD dla smartfonów */
                     @media (max-width: 640px) {

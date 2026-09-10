@@ -1,47 +1,58 @@
 const express = require('express');
-const sqlite3 = require('sqlite3').verbose();
+const { Pool } = require('pg');
 const crypto = require('crypto');
-const path = require('path');
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
-// Połączenie z bazą danych SQLite (plik urls.db powstanie automatycznie)
-const db = new sqlite3.Database('./urls.db', (err) => {
-    if (err) console.error('Błąd bazy danych:', err.message);
-    else console.log('Połączono z bazą danych SQLite.');
+// Połączenie z bazą PostgreSQL na Render.com
+const connectionString = process.env.DATABASE_URL || 'postgresql://skracacz_user:cS81Gp42bQUcew3NZIwQhPnnpTQaDLp0@dpg-dah5vt95efls738607vg-a.frankfurt-postgres.render.com/skracacz';
+
+const pool = new Pool({
+    connectionString: connectionString,
+    ssl: { rejectUnauthorized: false }
 });
 
-// Tworzenie tabeli w bazie danych, jeśli nie istnieje
-db.run(`
+// Tworzenie tabeli w bazie danych
+pool.query(`
     CREATE TABLE IF NOT EXISTS urls (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id SERIAL PRIMARY KEY,
         original_url TEXT NOT NULL,
-        short_code TEXT UNIQUE NOT NULL,
-        clicks INTEGER DEFAULT 0,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )
-`);
+        short_code VARCHAR(255) UNIQUE NOT NULL,
+        clicks INT DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+`, (err) => {
+    if (err) console.error('Błąd inicjalizacji bazy PostgreSQL:', err);
+    else console.log('Połączono z bazą PostgreSQL i przygotowano tabelę.');
+});
 
-// Middleware do obsługi formularzy i plików statycznych
 app.use(express.urlencoded({ extended: true }));
 
-// Funkcja pomocnicza do generowania losowego kodu
 function generateRandomCode(length = 6) {
     return crypto.randomBytes(length).toString('base64url').substring(0, length);
 }
 
 // ------------------- ROUTY / ŚCIEŻKI -------------------
 
-// 1. Strona główna z nowym, nowoczesnym designem
+// 1. Zwykła strona główna (Zablokowana dla obcych)
 app.get('/', (req, res) => {
-    db.all(`SELECT * FROM urls ORDER BY created_at DESC`, [], (err, rows) => {
-        if (err) return res.status(500).send('Błąd serwera');
+    res.status(404).send('404 Not Found - Strona nie istnieje.');
+});
+
+// 2. TAJNY PANEL ADMINISTRATORA (Dostępny tylko dla Ciebie)
+// Możesz zmienić '/1979admin' na własny tajny adres, np. '/moj-tajny-skracacz-99'
+app.get('/admin-panel', async (req, res) => {
+    const MY_DOMAIN = `${req.protocol}://${req.get('host')}`;
+
+    try {
+        const result = await pool.query('SELECT * FROM urls ORDER BY created_at DESC');
+        const rows = result.rows;
 
         let rowsHtml = rows.map(row => `
             <tr>
                 <td class="url-cell"><a href="${row.original_url}" target="_blank" rel="noopener">${row.original_url}</a></td>
-                <td class="short-url-cell"><a href="https://gornikleczna.pl/${row.short_code}" target="_blank" class="short-link">https://gornikleczna.pl/${row.short_code}</a></td>
+                <td class="short-url-cell"><a href="${MY_DOMAIN}/${row.short_code}" target="_blank" class="short-link">${MY_DOMAIN}/${row.short_code}</a></td>
                 <td><span class="badge">${row.clicks}</span></td>
             </tr>
         `).join('');
@@ -52,20 +63,20 @@ app.get('/', (req, res) => {
             <head>
                 <meta charset="UTF-8">
                 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <title>Nowoczesny Skracacz Linków</title>
+                <title>Panel Administracyjny - Skracacz Linków</title>
                 <style>
                     :root {
                         --bg-color: #f4f6f9;
                         --card-bg: #ffffff;
                         --primary: #018E45;
-                        --primary-hover: #4338ca;
+                        --primary-hover: #016e35;
                         --text-main: #1f2937;
                         --text-muted: #6b7280;
                         --border: #e5e7eb;
                         --danger: #ef4444;
                     }
 
-                    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+                    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
                     
                     body { background-color: var(--bg-color); color: var(--text-main); padding: 40px 20px; line-height: 1.5; }
                     
@@ -75,11 +86,11 @@ app.get('/', (req, res) => {
                     header h1 { font-size: 2rem; color: var(--text-main); font-weight: 700; margin-bottom: 8px; }
                     header p { color: var(--text-muted); }
 
-                    .card { background: var(--card-bg); padding: 30px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03); margin-bottom: 30px; }
+                    .card { background: var(--card-bg); padding: 30px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); margin-bottom: 30px; }
                     
                     .form-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 15px; margin-bottom: 15px; }
                     
-                    .form-group label { display: block; font-size: 0.875rem; font-weight: 600; margin-bottom: 6px; color: var(--text-main); }
+                    .form-group label { display: block; font-size: 0.875rem; font-weight: 600; margin-bottom: 6px; }
                     
                     input[type="text"], input[type="url"] {
                         width: 100%;
@@ -87,13 +98,12 @@ app.get('/', (req, res) => {
                         border: 1px solid var(--border);
                         border-radius: 8px;
                         font-size: 0.95rem;
-                        transition: border-color 0.2s, box-shadow 0.2s;
                         outline: none;
                     }
 
                     input:focus {
                         border-color: var(--primary);
-                        box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15);
+                        box-shadow: 0 0 0 3px rgba(1, 142, 69, 0.15);
                     }
 
                     button {
@@ -121,8 +131,6 @@ app.get('/', (req, res) => {
                     
                     td { padding: 14px 16px; border-bottom: 1px solid var(--border); vertical-align: middle; }
                     
-                    tr:last-child td { border-bottom: none; }
-
                     .url-cell { max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
                     .url-cell a { color: var(--text-muted); text-decoration: none; }
                     .url-cell a:hover { color: var(--text-main); text-decoration: underline; }
@@ -130,19 +138,16 @@ app.get('/', (req, res) => {
                     .short-link { color: var(--primary); font-weight: 600; text-decoration: none; }
                     .short-link:hover { text-decoration: underline; }
 
-                    .badge { display: inline-block; background-color: #e0e7ff; color: #018E45; font-weight: 700; padding: 4px 10px; border-radius: 12px; font-size: 0.8rem; }
+                    .badge { display: inline-block; background-color: #e6f4ed; color: #018E45; font-weight: 700; padding: 4px 10px; border-radius: 12px; font-size: 0.8rem; }
 
-                    /* RWD dla smartfonów */
-                    @media (max-width: 640px) {
-                        .form-grid { grid-template-columns: 1fr; }
-                    }
+                    @media (max-width: 640px) { .form-grid { grid-template-columns: 1fr; } }
                 </style>
             </head>
             <body>
                 <div class="container">
                     <header>
-                        <h1>Skracacz Linków</h1>
-                        <p>Wklej długi adres URL, aby stworzyć szybki i krótki odnośnik</p>
+                        <h1>Twój Panel Skracacza</h1>
+                        <p>Generuj bezpieczne linki i śledź kliknięcia</p>
                     </header>
 
                     <div class="card">
@@ -170,7 +175,7 @@ app.get('/', (req, res) => {
                                 <thead>
                                     <tr>
                                         <th>Oryginalny URL</th>
-                                        <th>Skrócony adres</th>
+                                        <th>Skrócony adres (.onrender.com)</th>
                                         <th>Kliknięcia</th>
                                     </tr>
                                 </thead>
@@ -184,54 +189,47 @@ app.get('/', (req, res) => {
             </body>
             </html>
         `);
-    });
+    } catch (err) {
+        res.status(500).send('Błąd bazy danych');
+    }
 });
 
-// 2. Obsługa tworzenia nowego skróconego linku
-app.post('/shorten', (req, res) => {
+// 3. Tworzenie skróconego linku
+app.post('/shorten', async (req, res) => {
     const originalUrl = req.body.url;
     let customAlias = req.body.custom_alias ? req.body.custom_alias.trim() : null;
-
     let shortCode = customAlias || generateRandomCode();
 
-    // Wstawienie do bazy danych
-    db.run(
-        `INSERT INTO urls (original_url, short_code) VALUES (?, ?)`,
-        [originalUrl, shortCode],
-        function (err) {
-            if (err) {
-                // Kod błędu dla unikalności w SQLite to SQLITE_CONSTRAINT
-                if (err.message.includes('UNIQUE constraint failed')) {
-                    return res.redirect('/?error=' + encodeURIComponent('Ten własny alias jest już zajęty! Wybierz inny.'));
-                }
-                return res.redirect('/?error=' + encodeURIComponent('Wystąpił błąd bazy danych.'));
-            }
-            res.redirect('/');
+    try {
+        await pool.query('INSERT INTO urls (original_url, short_code) VALUES ($1, $2)', [originalUrl, shortCode]);
+        // Powrót do tajnego panelu po skróceniu linku
+        res.redirect('/admin-panel');
+    } catch (err) {
+        if (err.code === '23505') {
+            return res.redirect('/admin-panel?error=' + encodeURIComponent('Ten alias jest już zajęty! Wybierz inny.'));
         }
-    );
+        res.redirect('/admin-panel?error=' + encodeURIComponent('Błąd podczas zapisywania linku.'));
+    }
 });
 
-// 3. Przekierowanie i zliczanie kliknięć
-app.get('/:code', (req, res) => {
+// 4. Publiczne przekierowanie ze skróconych kodów
+app.get('/:code', async (req, res) => {
     const code = req.params.code;
 
-    // Znajdź link w bazie
-    db.get(`SELECT * FROM urls WHERE short_code = ?`, [code], (err, row) => {
-        if (err || !row) {
+    try {
+        const result = await pool.query('SELECT * FROM urls WHERE short_code = $1', [code]);
+        if (result.rows.length === 0) {
             return res.status(404).send('Nie znaleziono takiego linku!');
         }
 
-        // Zwiększ licznik kliknięć o 1
-        db.run(`UPDATE urls SET clicks = clicks + 1 WHERE id = ?`, [row.id], (err) => {
-            if (err) console.error('Błąd aktualizacji kliknięć:', err);
-            
-            // Przekierowanie na oryginalny URL
-            res.redirect(row.original_url);
-        });
-    });
+        const row = result.rows[0];
+        await pool.query('UPDATE urls SET clicks = clicks + 1 WHERE id = $1', [row.id]);
+        res.redirect(row.original_url);
+    } catch (err) {
+        res.status(500).send('Błąd serwera');
+    }
 });
 
-// Uruchomienie serwera
 app.listen(PORT, () => {
-    console.log(`Aplikacja została pomyślnie uruchomiona na porcie ${PORT}`);
+    console.log(`Serwer uruchomiony na porcie ${PORT}`);
 });

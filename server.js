@@ -41,7 +41,7 @@ app.get('/', (req, res) => {
         let rowsHtml = rows.map(row => `
             <tr>
                 <td class="url-cell"><a href="${row.original_url}" target="_blank" rel="noopener">${row.original_url}</a></td>
-                <td class="short-url-cell"><a href="/${row.short_code}" target="_blank" class="short-link">http://localhost:${PORT}/${row.short_code}</a></td>
+                <td class="short-url-cell"><a href="/${row.short_code}" target="_blank" class="short-link">http://gornikleczna.pl/${row.short_code}</a></td>
                 <td><span class="badge">${row.clicks}</span></td>
             </tr>
         `).join('');
